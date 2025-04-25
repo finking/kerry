@@ -238,6 +238,7 @@ def calculate_total(futures, shares):
 def calculate_spread(total):
     """Формирование DataFrame spread."""
     try:
+        logging.info("Начало формирования spread.")
         # Текущая дата
         today_f = datetime.now()
         # Вычисление kerry_spread и kerry_spread_y
@@ -246,7 +247,8 @@ def calculate_spread(total):
             if len(group) > 1:  # Проверяем, что в группе больше одного фьючерса
                 sorted_group = group.sort_values(by="LASTDELDATE")  # Сортируем по дате экспирации
                 for i in range(len(sorted_group) - 1):
-                    shortname_futures = sorted_group.iloc[i]["SHORTNAME_futures"]
+                    # Формируем Name_spread
+                    name_spread = f"{sorted_group.iloc[i]['SHORTNAME_futures']}-{sorted_group.iloc[i + 1]['SHORTNAME_futures']}"
                     
                     # Проверка условий для знаменателя
                     last_shares_zero = sorted_group.iloc[i]["LAST_shares"] == 0
@@ -257,15 +259,15 @@ def calculate_spread(total):
                         # Логирование пропуска строки
                         if last_shares_zero:
                             logging.warning(
-                                f"Пропущена строка для SHORTNAME_futures={shortname_futures}: LAST_shares равен 0."
+                                f"Пропущена строка для {name_spread}: не было сделок по базовому активу."
                             )
                         if last_futures_zero:
                             logging.warning(
-                                f"Пропущена строка для SHORTNAME_futures={shortname_futures}: LAST_futures равен 0."
+                                f"Пропущена строка для {name_spread}: не было сделок по ближнему фчс."
                             )
                         if next_last_futures_zero:
                             logging.warning(
-                                f"Пропущена строка для SHORTNAME_futures={shortname_futures}: LAST_futures равен 0."
+                                f"Пропущена строка для {name_spread}: не было сделок по дальнему фчс."
                             )
                         continue  # Пропускаем вычисления
                     
@@ -285,12 +287,11 @@ def calculate_spread(total):
                         kerry_spread_y = None
                         # Логирование пропуска kerry_spread_y
                         logging.warning(
-                            f"Пропущено вычисление kerry_spread_y для SHORTNAME_futures={shortname_futures}: "
+                            f"Пропущено вычисление kerry_spread_y для {name_spread}: "
                             f"days_to_expiry <= 0."
                         )
                     
-                    # Формируем Name_spread
-                    name_spread = f"{sorted_group.iloc[i]['SHORTNAME_futures']}-{sorted_group.iloc[i + 1]['SHORTNAME_futures']}"
+                   
                     
                     # Добавляем данные в список
                     spread_data.append(
