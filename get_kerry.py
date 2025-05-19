@@ -19,7 +19,7 @@ logging.basicConfig(
 
 
 COLUMNS_SEC_FUTURES = "SECID,SHORTNAME,LASTDELDATE,SECTYPE,ASSETCODE,PREVOPENPOSITION,LOTVOLUME,INITIALMARGIN,TIME"
-COLUMNS_MD_FUTURES = "SECID,SPREAD,LAST,OPENPOSITION,NUMTRADES,TIME"
+COLUMNS_MD_FUTURES = "SYSTIME,SECID,SPREAD,LAST,OPENPOSITION,NUMTRADES,TIME"
 COLUMNS_SEC_SHARES = "SECID,SHORTNAME,LOTSIZE"
 COLUMNS_MD_SHARES = "SECID,BID,OFFER,SPREAD,LAST,TIME,SYSTIME"
 
@@ -94,10 +94,6 @@ def load_futures_data():
         # Заменяем значения ASSETCODE
         for old, new in replacements.items():
             futures["ASSETCODE"] = futures["ASSETCODE"].replace(old, new)
-        
-        # Добавляем столбец с текущей датой
-        current_date = datetime.now().strftime("%d.%m.%Y")  # Формат: ДД.ММ.ГГГГ
-        futures["Date"] = current_date
         
         logging.info("Данные по фьючерсам успешно обработаны.")
         return futures
@@ -183,12 +179,13 @@ def calculate_total(futures, shares):
     try:
         logging.info("Начало формирования DataFrame total.")
         
-        # Текущая дата
-        today_f = datetime.now()
+        # Получаем SYSTIME из futures (берем любое значение — оно одинаковое для всех строк)
+        systime_str = futures.iloc[0]["SYSTIME"]
+        today_f = pd.to_datetime(systime_str)
         
         # Формирование датафрейма total
         futures_subset = futures[
-            ["ASSETCODE", "SHORTNAME", "LAST", "LOTVOLUME", "LASTDELDATE", "TIME"]
+            ["SYSTIME", "ASSETCODE", "SHORTNAME", "LAST", "LOTVOLUME", "LASTDELDATE", "TIME"]
         ]
         shares_subset = shares[
             ["SECID", "SHORTNAME", "LAST", "TIME"]
@@ -239,8 +236,11 @@ def calculate_spread(total):
     """Формирование DataFrame spread."""
     try:
         logging.info("Начало формирования spread.")
-        # Текущая дата
-        today_f = datetime.now()
+        
+        # Получаем текущую дату из SYSTIME
+        systime_str = total.iloc[0]["SYSTIME"] if not total.empty else None
+        today_f = pd.to_datetime(systime_str) if systime_str else datetime.now()
+        
         # Вычисление kerry_spread и kerry_spread_y
         spread_data = []
         for assetcode, group in total.groupby("ASSETCODE"):
@@ -291,11 +291,10 @@ def calculate_spread(total):
                             f"days_to_expiry <= 0."
                         )
                     
-                   
-                    
                     # Добавляем данные в список
                     spread_data.append(
                         {
+                            "System_date": systime_str,
                             "Name_spread": name_spread,
                             "kerry_spread": kerry_spread,
                             "kerry_spread_y": kerry_spread_y,
